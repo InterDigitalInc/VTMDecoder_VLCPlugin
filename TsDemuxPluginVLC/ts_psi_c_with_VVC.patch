@@ -1,0 +1,15 @@
+1392c1392
+< 
+---
+> #define VLC_CODEC_VVC            VLC_FOURCC('h','2','6','6')
+1420,1423c1420
+<         /* https://trac.ffmpeg.org/ticket/320
+<          * Haivision's Makito encoder violates mapping by putting ADTS
+<            instead of LOAS, we can only hint that's not raw AAC */
+<         fmt->i_original_fourcc = VLC_FOURCC('H','E','A','D');
+---
+>         fmt->i_original_fourcc = VLC_FOURCC('L','A','T','M');
+1433a1431,1433
+>         break;
+>     case 0x32:  /* VVC */
+>         es_format_Change( fmt, VIDEO_ES, VLC_CODEC_VVC );
