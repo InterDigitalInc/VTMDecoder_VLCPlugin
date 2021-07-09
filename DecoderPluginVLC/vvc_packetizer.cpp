@@ -23,6 +23,7 @@
  * Preamble
  *****************************************************************************/
 #if defined(_MSC_VER)
+#define NOMINMAX
 #include <basetsd.h>
 typedef SSIZE_T ssize_t;
 #define strcasecmp(s1, s2) _stricmp(s1, s2)
@@ -50,6 +51,7 @@ typedef SSIZE_T ssize_t;
  *****************************************************************************/
 namespace VvcDecoder
 {
+  static const uint8_t* startcode_FindAnnexB(const uint8_t* p, const uint8_t* end);
   int  OpenPack(vlc_object_t*);
   void ClosePack(vlc_object_t*);
 }
@@ -74,7 +76,7 @@ struct decoder_sys_t
     {
         block_t *p_chain;
         block_t **pp_chain_last;
-    } frame;
+    } frame, frame2;
 
     //uint8_t  i_nal_length_size;
     bool b_init_sequence_complete;
@@ -85,12 +87,11 @@ struct decoder_sys_t
     int lastTid;
     bool b_need_ts;
     bool sliceInPicture;
-    bool firstSliceInPicture;
     bool gotSps;
     bool gotPps;
 };
 
-static const uint8_t p_vcc_startcode[4] = { 0x00, 0x00, 0x01};
+static const uint8_t p_vcc_startcode[3] = { 0x00, 0x00, 0x01};
 /****************************************************************************
  * Helpers
  ****************************************************************************/
@@ -156,6 +157,19 @@ static block_t * OutputQueues(decoder_sys_t *p_sys, bool b_valid)
     return p_output;
 }
 
+const uint8_t* VvcDecoder::startcode_FindAnnexB(const uint8_t* p, const uint8_t* end)
+{
+  for (end -= sizeof(p_vcc_startcode) - 1; p < end; p++)
+  {
+    bool match = true;
+    for (int i=0; i<sizeof(p_vcc_startcode); i++)
+    {
+      match &= p[i] == p_vcc_startcode[i];
+    }
+    if (match) return p;
+  }
+  return NULL;
+}
 
 /*****************************************************************************
  * Open
@@ -173,8 +187,8 @@ int VvcDecoder::OpenPack(vlc_object_t *p_this)
         return VLC_ENOMEM;
 
     INITQ(frame);
+    INITQ(frame2);
     p_sys->sliceInPicture = false;
-    p_sys->firstSliceInPicture = false;
     p_sys->lastTid = 0;
     p_sys->gotPps = false;
     p_sys->gotSps = false;
@@ -187,7 +201,7 @@ int VvcDecoder::OpenPack(vlc_object_t *p_this)
     p_pack->i_offset = 0;
 
     packetizer_Init(&p_dec->p_sys->packetizer,
-      p_vcc_startcode, sizeof(p_vcc_startcode), startcode_FindAnnexB,
+      p_vcc_startcode, sizeof(p_vcc_startcode), VvcDecoder::startcode_FindAnnexB,
       p_vcc_startcode, 1, 5,
       PacketizeReset, PacketizeParse, PacketizeValidate, p_dec);
     
@@ -379,7 +393,7 @@ static block_t *ParseNALBlock(decoder_t *p_dec, bool *pb_ts_used, block_t *p_fra
 
     bool isNewPicture = false;
     bool currentIsFirstSlice = false;
-  
+    bool maybeNew = false;
     switch (i_nal_type)//nalu.m_nalUnitType)
     {
       // NUT that indicate the start of a new picture
@@ -390,8 +404,6 @@ static block_t *ParseNALBlock(decoder_t *p_dec, bool *pb_ts_used, block_t *p_fra
     case VVC_NAL_SPS:
     case VVC_NAL_PPS:
     case VVC_NAL_PH:
-    case VVC_NAL_PREFIX_APS:
-    case VVC_NAL_PREFIX_SEI:
       isNewPicture = p_sys->sliceInPicture;
       break;
 
@@ -410,17 +422,20 @@ static block_t *ParseNALBlock(decoder_t *p_dec, bool *pb_ts_used, block_t *p_fra
     case VVC_NAL_RESERVED_IRAP_VCL_11:
       p_frag->i_flags |= BLOCK_FLAG_TYPE_P;
       // checkPictureHeaderInSliceHeaderFlag
-      currentIsFirstSlice = ((p_frag->p_buffer[6] >> 7) & 0x1);
+      currentIsFirstSlice = ((p_frag->p_buffer[6] >> 7) & 0x1) || !p_sys->sliceInPicture;
       isNewPicture = p_sys->sliceInPicture && currentIsFirstSlice;
       p_sys->sliceInPicture = true;
-      p_sys->firstSliceInPicture = currentIsFirstSlice || p_sys->firstSliceInPicture == false;
       break;
 
     case VVC_NAL_EOS:
     case VVC_NAL_EOB:
       isNewPicture = true;
       break;
+    case VVC_NAL_SUFFIX_SEI:
+    case VVC_NAL_SUFFIX_APS:
+      break;
     default:
+      maybeNew = p_sys->sliceInPicture;
       break;
     }
  
@@ -452,10 +467,27 @@ static block_t *ParseNALBlock(decoder_t *p_dec, bool *pb_ts_used, block_t *p_fra
       p_sys->sliceInPicture = currentIsFirstSlice;
     }
     p_sys->lastTid = i_nal_temporal_ID;
-    block_ChainLastAppend(&p_sys->frame.pp_chain_last, p_frag);
+    if (maybeNew)
+    {
+      block_ChainLastAppend(&p_sys->frame2.pp_chain_last, p_frag);
+    }
+    else
+    {
+      if (p_sys->frame2.p_chain)
+      {
+        block_ChainLastAppend(&p_sys->frame.pp_chain_last, p_sys->frame2.p_chain);
+        INITQ(frame2);
+      }
+      block_ChainLastAppend(&p_sys->frame.pp_chain_last, p_frag);
+    }
 
     if (p_frag->i_flags & BLOCK_FLAG_LAST_PACKET_MASK)
     {
+      if (p_sys->frame2.p_chain)
+      {
+        block_ChainLastAppend(&p_sys->frame.pp_chain_last, p_sys->frame2.p_chain);
+        INITQ(frame2);
+      }
       block_t* flushOutput = OutputQueues(p_sys, p_sys->b_init_sequence_complete);
       block_ChainAppend(&p_output, flushOutput);
     }
