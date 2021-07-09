@@ -116,6 +116,7 @@ set_subcategory(SUBCAT_INPUT_VCODEC)
 set_callbacks(OpenDecoder, CloseDec)
 add_integer("nb-threads", 0, N_("Number of threads for decoding"), N_("number of threads for decoding in the range [1-32]; 0: automatic detection of cores "), false)
 add_integer("nb-threads-parsing", -1, N_("Maximum number of threads for CABAC parsing"), N_("Maximum number of threads for CABAC parsing (from same pool as decoding threads) [1-32]; -1: auto; 0: sequantial parsing and decoding"), false)
+add_integer("target-layer-set", -1, N_("Target output layer set"), N_("Target output layer set (for multi-layer streams)"), false)
 add_bool("vvc-enable-hurry-mode", true, N_("Enable hurry-up mode"), N_("hurry-up mode: skip decoding pictures if late"), false)
 
 add_submodule()
@@ -204,6 +205,13 @@ static int OpenDecoder(vlc_object_t * p_this)
     p_sys->enable_hurryMode = var_CreateGetBool(p_dec, psz_hurryvar);
   }
 
+  char psz_targetLayer[30];
+  int targetLayerSet = -1;
+  if (sprintf(psz_targetLayer, "target-layer-set"))
+  {
+    targetLayerSet = var_CreateGetInteger(p_dec, psz_targetLayer);
+  }
+
 #ifdef WIN32
   SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
   char* baseName = strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : (strrchr(__FILE__, '\\') ? strrchr(__FILE__, '\\') + 1 : __FILE__);
@@ -260,7 +268,7 @@ static int OpenDecoder(vlc_object_t * p_this)
 
   msg_Info(p_dec, "using decoder with cfg --nbThreads=%d --nbThreadsForParsing=%d", nbThreads, nbThreadsForParsing);
   // create & initialize internal classes
-  if (!(p_sys->decVtm = decVTM_create(nbThreads, nbThreadsForParsing)))
+  if (!(p_sys->decVtm = decVTM_create(nbThreads, nbThreadsForParsing, targetLayerSet)))
   {
     return VLC_EGENERIC;
   }
