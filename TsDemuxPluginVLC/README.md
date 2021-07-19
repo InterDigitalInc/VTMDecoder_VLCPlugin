@@ -1,9 +1,18 @@
 TS demux with a new es vvc stream format ID
 
-For linux:
-use the patch to add a ES format for VVC when building VLC
+Modified tsDemux plugin to include the "h266" FOURCC for the VVC stream in a ts stream.
 
-For Windows:
+-------------------
+Alternative
+-------------------
+An alternative to building a ts Demux is explicitly specifying a FOURCC "h266" for the VVC stream:
+use VLS with the following parameters (either command line, or in the options dialog:
+--ts-extra-pmt=2:7=pid:video=h266 --program=7 (with pid=pid of the VVC stream)
+
+
+-------------------
+On WINDOWS
+-------------------
 use CMake to build the dll
 
 Prerequisites:
@@ -30,3 +39,8 @@ set CMake variables:
 - DVBPSI_DIR: ("dvbpsi") path to dvbpsi source dir (ex: version 1.3.2)
 
 Generate and build !
+
+-------------------
+On Linux
+-------------------
+use the patch to add a ES format for VVC when building VLC
