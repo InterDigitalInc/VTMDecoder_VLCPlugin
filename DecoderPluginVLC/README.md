@@ -6,7 +6,7 @@ VVC decoder library libvtmdec
 - currently VTM-14 version can be found here:
   https://vcgit.hhi.fraunhofer.de/delagrangep/VVCSoftware_VTM/-/tree/VTM-14.0-MT
 - for Windows, a precompiled .dll is available
-- otherwise, get the sources and build libvtmdec decoder library (enable option "BUILD_VTM_LIB" in CMake).
+- otherwise, get the sources and build libvtmdec decoder library (enable option "BUILD_LIBVTMDEC" in CMake).
 
 
 VLC Pugin:
