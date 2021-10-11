@@ -35,7 +35,7 @@
 
 #include <algorithm>
 #include <memory>
-#include "DecVTMLib.h"
+#include "LibVTMDec.h"
 
 #ifdef HAVE_CONFIG_H
 # include "config.h"
@@ -215,8 +215,8 @@ static int OpenDecoder(vlc_object_t * p_this)
 #ifdef WIN32
   SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
   char* baseName = strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : (strrchr(__FILE__, '\\') ? strrchr(__FILE__, '\\') + 1 : __FILE__);
-  HRESULT loadLibRes = __HrLoadAllImportsForDll(VTM_LIB_NAME);
-  if (loadLibRes != S_OK)
+  HMODULE loadLibRes = LoadLibrary(VTM_LIB_NAME);
+  if (!loadLibRes)
   {
     msg_Info(p_dec, "%s: could not load library %s on default path, try plugin directory", baseName, VTM_LIB_NAME);
     char currentDllDir[MAX_PATH];

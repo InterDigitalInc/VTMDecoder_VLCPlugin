@@ -66,23 +66,22 @@ set( VLC_PROGRAM_DIR "C:/VLC" CACHE PATH "will output dll in plugin dir of VLC" 
 set( VLC_INCLUDE_DIR "${VLC_PROGRAM_DIR}/sdk/include/vlc/plugins" CACHE PATH "path to VLC core source files" )
 set( VLC_LIB_DIR "${VLC_PROGRAM_DIR}/sdk/lib" CACHE PATH "path to VLC core lib files" )
 IF(WIN32)
-set( DecVTMLib_Name "DecVTMLib" CACHE PATH "name of the VTM decoder lib" )
-
-set(VLC_LIBs "${VLC_LIB_DIR}/libvlccore.lib" )
+set( VTMDEC_LIB_NAME "libvtmdec" CACHE PATH "name of the VTM decoder lib" )
+set( VLC_LIBs "${VLC_LIB_DIR}/libvlccore.lib" )
 ELSE()
-set( DecVTMLib_Name "libdecVTMLib.so" CACHE PATH "name of the VTM decoder lib" )
-set(VLC_LIBs "${VLC_LIB_DIR}/libvlccore.so" )
+set( VTMDEC_LIB_NAME "libvtmdec.so" CACHE PATH "name of the VTM decoder lib" )
+set( VLC_LIBs "${VLC_LIB_DIR}/libvlccore.so" )
 ENDIF()
 
 # add executable
 add_library( ${LIB_NAME} SHARED ${SRC_FILES} ${INC_FILES} ${NATVIS_FILES} )
 
-target_include_directories( ${LIB_NAME} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}" "${VLC_INCLUDE_DIR}" "${VTM_DIR}/source/App/DecVTMLib")
+target_include_directories( ${LIB_NAME} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}" "${VLC_INCLUDE_DIR}" "${VTM_DIR}/source/App/LibVTMDec")
 
 file( GLOB SRC_FILES "*.cpp" )
 
 target_link_directories( ${LIB_NAME} PRIVATE "${VTM_DIR}/lib")
-target_link_libraries( ${LIB_NAME} PRIVATE ${VLC_LIBs} ${DecVTMLib_Name} )
+target_link_libraries( ${LIB_NAME} PRIVATE ${VLC_LIBs} ${VTMDEC_LIB_NAME} )
 
 # set the folder where to place the projects
 IF(WIN32)
@@ -91,15 +90,15 @@ set_target_properties( ${LIB_NAME}  PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY_DEBUG "${VLC_PROGRAM_DIR}/plugins/codec"
     RUNTIME_OUTPUT_DIRECTORY_RELEASE "${VLC_PROGRAM_DIR}/plugins/codec"
 )
-SET_TARGET_PROPERTIES(${LIB_NAME} PROPERTIES LINK_FLAGS "/DELAYLOAD:${DecVTMLib_Name}.dll")
-target_compile_definitions( ${LIB_NAME} PRIVATE VTM_LIB_NAME="${DecVTMLib_Name}.dll" )
+SET_TARGET_PROPERTIES(${LIB_NAME} PROPERTIES LINK_FLAGS "/DELAYLOAD:${VTMDEC_LIB_NAME}.dll")
+target_compile_definitions( ${LIB_NAME} PRIVATE VTM_LIB_NAME="${VTMDEC_LIB_NAME}.dll" )
 ELSEIF( CMAKE_SYSTEM_NAME STREQUAL "Linux" )
   add_custom_command( TARGET ${LIB_NAME} POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy 
                                                           ${CMAKE_BINARY_DIR}/lib${LIB_NAME}.so
                                                           ${VLC_PROGRAM_DIR}/modules/.libs/lib${LIB_NAME}.so)
   add_custom_command( TARGET ${LIB_NAME} POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy 
-                                                          ${VTM_DIR}/lib/${DecVTMLib_Name}
-                                                          ${VLC_PROGRAM_DIR}/modules/.libs/${DecVTMLib_Name})
+                                                          ${VTM_DIR}/lib/${VTMDEC_LIB_NAME}
+                                                          ${VLC_PROGRAM_DIR}/modules/.libs/${VTMDEC_LIB_NAME})
 ENDIF()
 
 target_compile_definitions( ${LIB_NAME} PRIVATE MODULE_STRING="vvcdecoder" __PLUGIN__ )
