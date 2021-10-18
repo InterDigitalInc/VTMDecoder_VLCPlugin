@@ -415,7 +415,7 @@ static int Demux(demux_t* p_demux)
 
         es_out_SetPCR(p_demux->out, date_Get(&p_sys->dts));
         unsigned i_nb_frames;
-        if (p_sys->baseLayerID < 0 || nuhLayerId < p_sys->baseLayerID)
+        if (p_sys->baseLayerID < 0 || (int)nuhLayerId < p_sys->baseLayerID)
         {
           p_sys->baseLayerID = nuhLayerId;
         }

@@ -469,7 +469,7 @@ static block_t *ParseNALBlock(decoder_t *p_dec, bool *pb_ts_used, block_t *p_fra
       {
         p_sys->frame.p_chain->i_flags |= (p_sys->lastTid < 2 )? BLOCK_FLAG_TYPE_P: BLOCK_FLAG_TYPE_B;
         // Starting new frame: return previous frame data for output 
-        if (p_sys->baseLayerID < 0 || nuhLayerId < p_sys->baseLayerID)
+        if (p_sys->baseLayerID < 0 || (int)nuhLayerId < p_sys->baseLayerID)
         {
           p_sys->baseLayerID = nuhLayerId;
         }
