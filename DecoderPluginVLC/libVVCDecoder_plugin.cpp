@@ -209,7 +209,7 @@ static int OpenDecoder(vlc_object_t * p_this)
   int targetLayerSet = -1;
   if (sprintf(psz_targetLayer, "target-layer-set"))
   {
-    targetLayerSet = var_CreateGetInteger(p_dec, psz_targetLayer);
+    targetLayerSet = (int)var_CreateGetInteger(p_dec, psz_targetLayer);
   }
 
 #ifdef WIN32
@@ -671,7 +671,11 @@ static bool getOutputFrame(decoder_t* p_dec, bool waitUntilReady, mtime_t i_dts)
       mtime_t i_pts = date_Get(&p_sys->pts);
       if (i_pts == VLC_TS_INVALID)
       {
-        i_pts = p_sys->firstBlock_dts ;
+        date_t firstBlockDate = p_sys->pts;
+        int decoderFrameDelay = std::min(p_dec->i_extra_picture_buffers, std::max(0, (int)p_sys->dec_frame_count - (int)p_sys->out_frame_count));
+        date_Set(&firstBlockDate, p_sys->firstBlock_dts);
+        date_Increment(&firstBlockDate, decoderFrameDelay);
+        i_pts = date_Get(&firstBlockDate);
       }
       if (i_pts > VLC_TS_INVALID)
         date_Set(&p_sys->pts, i_pts);
