@@ -156,7 +156,7 @@ static int OpenDecoder(vlc_object_t * p_this)
   decoder_t* p_dec = (decoder_t*)p_this;
  
   // Allocate the memory needed to store the decoder's structure 
-  decoder_sys_t* p_sys = (decoder_sys_t * )calloc(1, sizeof(*p_sys));
+  decoder_sys_t* p_sys = new decoder_sys_t;
   if (unlikely(p_sys == NULL))
     return VLC_ENOMEM;
 
@@ -815,5 +815,5 @@ static void CloseDec(vlc_object_t* p_this)
   msg_Info(p_dec, "output %d frames",p_dec->p_sys->out_frame_count);
   decVTM_flush(p_dec->p_sys->decVtm);
   decVTM_destroy(p_dec->p_sys->decVtm);
-  free(p_dec->p_sys);
+  delete p_dec->p_sys;
 }
