@@ -89,6 +89,7 @@ struct decoder_sys_t
     bool sliceInPicture;
     bool gotSps;
     bool gotPps;
+    int baseLayerID;
 };
 
 static const uint8_t p_vcc_startcode[3] = { 0x00, 0x00, 0x01};
@@ -194,6 +195,7 @@ int VvcDecoder::OpenPack(vlc_object_t *p_this)
     p_sys->gotSps = false;
     p_sys->b_init_sequence_complete  = false;
     p_sys->i_nb_frames = 0;
+    p_sys->baseLayerID = -1;
 
     packetizer_t* p_pack = &p_dec->p_sys->packetizer;
     p_pack->i_state = STATE_NOSYNC;
@@ -386,8 +388,18 @@ static block_t *ParseNALBlock(decoder_t *p_dec, bool *pb_ts_used, block_t *p_fra
     }
 
     // get next NAL unit type
-    vvc_nal_unit_type_e i_nal_type = (vvc_nal_unit_type_e) ((p_frag->p_buffer[5] >> 3) & 0x1f);
-    int i_nal_temporal_ID = ((p_frag->p_buffer[5]) & 0x07) - 1;
+    int firstByte = 4;
+    if (p_frag->p_buffer[0] == 0 && p_frag->p_buffer[1] == 0 && p_frag->p_buffer[2] == 0 && p_frag->p_buffer[3] == 1)
+    {
+      firstByte = 4;
+    }
+    else if (p_frag->p_buffer[0] == 0 && p_frag->p_buffer[1] == 0 && p_frag->p_buffer[2] == 1)
+    {
+      firstByte = 3;
+    }
+    uint32_t nuhLayerId = ((p_frag->p_buffer[firstByte]) & 0x3f);
+    vvc_nal_unit_type_e i_nal_type = (vvc_nal_unit_type_e) ((p_frag->p_buffer[firstByte+1] >> 3) & 0x1f);
+    int i_nal_temporal_ID = ((p_frag->p_buffer[firstByte+1]) & 0x07) - 1;
     const mtime_t dts = p_frag->i_dts, pts = p_frag->i_pts;
     block_t * p_output = NULL;
 
@@ -457,10 +469,17 @@ static block_t *ParseNALBlock(decoder_t *p_dec, bool *pb_ts_used, block_t *p_fra
       {
         p_sys->frame.p_chain->i_flags |= (p_sys->lastTid < 2 )? BLOCK_FLAG_TYPE_P: BLOCK_FLAG_TYPE_B;
         // Starting new frame: return previous frame data for output 
-        date_Increment(&p_sys->dts, 1);
-        if (dts > VLC_TS_INVALID)
-          date_Set(&p_sys->dts, dts);
-        p_sys->pts = pts;
+        if (p_sys->baseLayerID < 0 || nuhLayerId < p_sys->baseLayerID)
+        {
+          p_sys->baseLayerID = nuhLayerId;
+        }
+        if (nuhLayerId == p_sys->baseLayerID)
+        {
+          date_Increment(&p_sys->dts, 1);
+          if (dts > VLC_TS_INVALID)
+            date_Set(&p_sys->dts, dts);
+          p_sys->pts = pts;
+        }
         *pb_ts_used = true;
         p_output = OutputQueues(p_sys, p_sys->b_init_sequence_complete);
       }

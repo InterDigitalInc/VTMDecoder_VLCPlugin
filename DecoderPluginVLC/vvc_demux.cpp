@@ -54,6 +54,7 @@ struct demux_sys_t
   date_t      dts;
   unsigned    frame_rate_num;
   unsigned    frame_rate_den;
+  int         baseLayerID;
 
   decoder_t *p_packetizer;
 };
@@ -101,21 +102,17 @@ static int ProbeVVC(const uint8_t* p_peek, size_t i_peek, vvc_probe_ctx_t* p_ctx
     return -1;
 
   // get next NAL unit type
-  vvc_nal_unit_type_e i_nal_type = VVC_NAL_INVALID;
-  uint32_t nuhLayerId = 0;
-  int nextByte = 0;
+  int firstByte = 0;
   if (p_peek[0] == 0 && p_peek[1] == 0 && p_peek[2] == 0 && p_peek[3] == 1)
   {
-    nuhLayerId = (vvc_nal_unit_type_e)((p_peek[4]) & 0x3f);
-    i_nal_type = (vvc_nal_unit_type_e)((p_peek[5] >> 3) & 0x1f);
-    nextByte = 6;
+    firstByte = 4;
   }
   else if(p_peek[0] == 0 && p_peek[1] == 0 && p_peek[2] ==1)
   {
-    nuhLayerId = (vvc_nal_unit_type_e)((p_peek[3]) & 0x3f);
-    i_nal_type = (vvc_nal_unit_type_e)((p_peek[4] >> 3) & 0x1f);
-    nextByte = 5;
+    firstByte = 3;
   }
+  int nuhLayerId = (firstByte > 0) ? ((p_peek[firstByte]) & 0x3f) : 0;
+  vvc_nal_unit_type_e i_nal_type = (firstByte > 0) ? (vvc_nal_unit_type_e)((p_peek[firstByte + 1] >> 3) & 0x1f) : VVC_NAL_INVALID;
   int ret = 0; // Probe more
   switch (i_nal_type)
   {
@@ -133,7 +130,7 @@ static int ProbeVVC(const uint8_t* p_peek, size_t i_peek, vvc_probe_ctx_t* p_ctx
     break;
   case VVC_NAL_VPS: /* VPS */
     if (nuhLayerId != 0 || i_peek < 7 ||
-      ((p_peek[nextByte] >> 4) & 0x0F) == 0) // Check setVPSId 
+      ((p_peek[firstByte + 2] >> 4) & 0x0F) == 0) // Check setVPSId 
       ret = -1;
     p_ctx->b_vps = true;
     break;
@@ -153,7 +150,7 @@ static int ProbeVVC(const uint8_t* p_peek, size_t i_peek, vvc_probe_ctx_t* p_ctx
     break;
   case VVC_NAL_ACCESS_UNIT_DELIMITER: /* AU */
     if (i_peek < H26X_MIN_PEEK - 4 ||
-      p_peek[nextByte + 1] != 0 || p_peek[nextByte + 2] != 0) /* Must prefix another NAL */
+      p_peek[firstByte + 3] != 0 || p_peek[firstByte + 4] != 0) /* Must prefix another NAL */
       ret = -1;
     break;
   case VVC_NAL_PREFIX_SEI: /* Prefix SEI */
@@ -266,6 +263,7 @@ int VvcDecoder::OpenDemux(vlc_object_t* p_this)
   p_sys->p_es = NULL;
   p_sys->frame_rate_num = 0;
   p_sys->frame_rate_den = 0;
+  p_sys->baseLayerID = -1;
 
   double fps = 0;
   char psz_fpsvar[10];
@@ -379,6 +377,20 @@ static int Demux(demux_t* p_demux)
       bool frame = p_block_out->i_flags & BLOCK_FLAG_TYPE_MASK;
       const mtime_t i_frame_dts = p_block_out->i_dts;
       const mtime_t i_frame_length = p_block_out->i_length;
+      uint32_t nuhLayerId = 0;
+      if (frame)
+      {
+        int firstByte = 4;
+        if (p_block_out->p_buffer[0] == 0 && p_block_out->p_buffer[1] == 0 && p_block_out->p_buffer[2] == 0 && p_block_out->p_buffer[3] == 1)
+        {
+          firstByte = 4;
+        }
+        else if (p_block_out->p_buffer[0] == 0 && p_block_out->p_buffer[1] == 0 && p_block_out->p_buffer[2] == 1)
+        {
+          firstByte = 3;
+        }
+        nuhLayerId = ((p_block_out->p_buffer[firstByte]) & 0x3f);
+      }
       es_out_Send(p_demux->out, p_sys->p_es, p_block_out);
       if (frame)
       {
@@ -403,6 +415,10 @@ static int Demux(demux_t* p_demux)
 
         es_out_SetPCR(p_demux->out, date_Get(&p_sys->dts));
         unsigned i_nb_frames;
+        if (p_sys->baseLayerID < 0 || nuhLayerId < p_sys->baseLayerID)
+        {
+          p_sys->baseLayerID = nuhLayerId;
+        }
         if (i_frame_length > 0)
         {
           i_nb_frames = (unsigned int)(i_frame_length * p_sys->frame_rate_num /
@@ -410,9 +426,16 @@ static int Demux(demux_t* p_demux)
         }
         else i_nb_frames = 1;
         if (i_nb_frames <= 3) 
-          date_Increment(&p_sys->dts, i_nb_frames);
+        {
+          if (nuhLayerId == p_sys->baseLayerID)
+          {
+            date_Increment(&p_sys->dts, i_nb_frames);
+          }
+        }
         else // Somehow some discontinuity 
+        {
           date_Set(&p_sys->dts, i_frame_dts);
+        }
       }
 
       if (p_block_in)
