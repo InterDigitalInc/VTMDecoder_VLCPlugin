@@ -282,6 +282,8 @@ int VvcDecoder::OpenDemux(vlc_object_t* p_this)
       int pos = (int)path.find("Hz");
       if (pos == std::string::npos) (int)path.find("HZ");
       if (pos == std::string::npos) (int)path.find("hz");
+      if (pos == std::string::npos) (int)path.find("fps");
+      if (pos == std::string::npos) (int)path.find("FPS");
       if (pos != std::string::npos && pos > 0)
       {
         int length = 1;
@@ -433,8 +435,8 @@ static int Control(demux_t* p_demux, int i_query, va_list args)
     return VLC_EGENERIC;
   else
     return demux_vaControlHelper(p_demux->s,
-      0, -1,
-      0, 1, i_query, args);
+      0, 0,
+      0, 0, i_query, args);
 }
 
 static inline bool check_Property(demux_t* p_demux, const char** pp_psz,
