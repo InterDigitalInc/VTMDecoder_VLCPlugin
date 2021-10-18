@@ -31,8 +31,8 @@ from the command line of from the configuration dialog: go to Tools / Preference
 select "show allow parameters" on the bottom-left, then look for Input/codecs /
 Video codecs / vvcdec.
 
-parameter description of the decoder
-<parameter>				<description>
+Decoder parameters description
+
 nb-threads				integer (default 0), number of threads for decoding in the range [1-32]; 0: automatic detection of cores
 nb-threads-parsing		integer (default -1), Maximum number of threads for CABAC parsing (from same pool as decoding threads) [1-32]; -1: auto; 0: sequantial parsing and decoding
 target-layer-set		integer (default -1), Target output layer set (for multi-layer streams)
