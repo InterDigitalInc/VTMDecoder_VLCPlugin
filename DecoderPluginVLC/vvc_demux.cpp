@@ -32,6 +32,7 @@ typedef SSIZE_T ssize_t;
 # include "config.h"
 #endif
 #include <string>
+#include <vector>
 #include <vlc_common.h>
 #include <vlc_plugin.h>
 #include <vlc_demux.h>
@@ -57,6 +58,16 @@ struct demux_sys_t
   int         baseLayerID;
 
   decoder_t *p_packetizer;
+  struct demux_layer_info
+  {
+    int order_id;
+    int id;
+    es_out_id_t *p_es;
+    es_format_t layer_es_fmt;
+    char layer_name[30];
+    std::vector<int> output_layers;
+  };
+  std::vector<demux_layer_info> inputLayers;
 };
 
 typedef struct
@@ -259,11 +270,12 @@ int VvcDecoder::OpenDemux(vlc_object_t* p_this)
 
   p_demux->pf_demux = Demux;
   p_demux->pf_control = Control;
-  p_demux->p_sys = p_sys = (demux_sys_t *)malloc(sizeof(demux_sys_t));
+  p_demux->p_sys = p_sys = new demux_sys_t;
   p_sys->p_es = NULL;
   p_sys->frame_rate_num = 0;
   p_sys->frame_rate_den = 0;
   p_sys->baseLayerID = -1;
+  p_sys->inputLayers.reserve(100);
 
   double fps = 0;
   char psz_fpsvar[10];
@@ -390,7 +402,73 @@ static int Demux(demux_t* p_demux)
           firstByte = 3;
         }
         nuhLayerId = ((p_block_out->p_buffer[firstByte]) & 0x3f);
+
+        bool inputLayerNew = true;
+        unsigned int inputLayerIdx = 0;
+        for (unsigned int i = 0; i < p_sys->inputLayers.size(); i++)
+        {
+          if (p_sys->inputLayers[i].id == nuhLayerId)
+          {
+            inputLayerIdx = i;
+            inputLayerNew = false;
+            break;
+          }
+        }
+        if (inputLayerNew)
+        {
+          inputLayerIdx = p_sys->inputLayers.empty() ? 0 : p_sys->inputLayers.back().order_id + 1;
+          es_out_id_t* es = nullptr;
+          es_format_t layer_es_fmt;
+          es_format_Copy(&layer_es_fmt, &p_sys->p_packetizer->fmt_out);
+          if (inputLayerIdx == 0)
+          {
+            es = p_sys->p_es;
+            demux_sys_t::demux_layer_info layer = { inputLayerIdx, nuhLayerId, es, layer_es_fmt };
+            p_sys->inputLayers.push_back(layer);
+          }
+          else 
+          {
+            if (inputLayerIdx == 1)
+            {
+              demux_sys_t::demux_layer_info layer0 = { 0, nuhLayerId, es, layer_es_fmt };
+              sprintf(p_sys->inputLayers.back().layer_name, "decide from ols");
+              p_sys->inputLayers.back().layer_es_fmt.psz_language = p_sys->inputLayers.back().layer_name;
+              p_sys->inputLayers.push_back(layer0);
+              sprintf(p_sys->inputLayers.back().layer_name, "layer 0 only");
+              p_sys->inputLayers.back().layer_es_fmt.psz_language = p_sys->inputLayers.back().layer_name;
+              p_sys->inputLayers.back().output_layers.push_back(0);
+              p_sys->inputLayers.back().layer_es_fmt.p_extra = &p_sys->inputLayers.back().output_layers;
+              p_sys->inputLayers.back().layer_es_fmt.i_extra = sizeof(&p_sys->inputLayers.back().output_layers);
+              es = es_out_Add(p_demux->out, &p_sys->inputLayers.back().layer_es_fmt);
+            }
+            demux_sys_t::demux_layer_info layeri = { inputLayerIdx, nuhLayerId, es, layer_es_fmt };
+            p_sys->inputLayers.push_back(layeri);
+            sprintf(p_sys->inputLayers.back().layer_name, "layer %d only", nuhLayerId);
+            p_sys->inputLayers.back().layer_es_fmt.psz_language = p_sys->inputLayers.back().layer_name;
+            p_sys->inputLayers.back().output_layers.push_back(inputLayerIdx);
+            p_sys->inputLayers.back().layer_es_fmt.p_extra = &p_sys->inputLayers.back().output_layers;
+            p_sys->inputLayers.back().layer_es_fmt.i_extra = sizeof(&p_sys->inputLayers.back().output_layers);
+            es = es_out_Add(p_demux->out, &p_sys->inputLayers.back().layer_es_fmt);
+
+            demux_sys_t::demux_layer_info layer = { inputLayerIdx, nuhLayerId, es, layer_es_fmt };
+            p_sys->inputLayers.push_back(layer);
+            sprintf(p_sys->inputLayers.back().layer_name, "layer ids 0 -> %d", inputLayerIdx);
+            p_sys->inputLayers.back().layer_es_fmt.psz_language = p_sys->inputLayers.back().layer_name;
+            for (demux_sys_t::demux_layer_info& l : p_sys->inputLayers)
+            {
+              if (l.id < nuhLayerId)
+              {
+                p_sys->inputLayers.back().output_layers.push_back(l.id);
+              }
+            }
+            p_sys->inputLayers.back().layer_es_fmt.p_extra = &p_sys->inputLayers.back().output_layers;
+            p_sys->inputLayers.back().layer_es_fmt.i_extra = sizeof(&p_sys->inputLayers.back().output_layers);
+            es = es_out_Add(p_demux->out, &p_sys->inputLayers.back().layer_es_fmt);
+          }
+          msg_Dbg(p_demux, "new layer defined as a stream nb %d: %d (total options %d) ", inputLayerIdx, nuhLayerId, p_sys->inputLayers.size());
+        }
       }
+
       es_out_Send(p_demux->out, p_sys->p_es, p_block_out);
       if (frame)
       {
@@ -454,12 +532,17 @@ static int Demux(demux_t* p_demux)
  *****************************************************************************/
 static int Control(demux_t* p_demux, int i_query, va_list args)
 {
-  if (i_query == DEMUX_SET_TIME)
+  switch (i_query)
+  {
+  case DEMUX_SET_TIME:
     return VLC_EGENERIC;
-  else
+  case DEMUX_SET_ES:
+    msg_Dbg(p_demux, "changed stream !");
+  default:
     return demux_vaControlHelper(p_demux->s,
       0, 0,
       0, 0, i_query, args);
+  }
 }
 
 static inline bool check_Property(demux_t* p_demux, const char** pp_psz,
@@ -484,5 +567,5 @@ void VvcDecoder::CloseDemux(vlc_object_t* p_this)
   demux_sys_t* p_sys = p_demux->p_sys;
 
   demux_PacketizerDestroy(p_sys->p_packetizer);
-  free(p_sys);
+  delete p_sys;
 }
