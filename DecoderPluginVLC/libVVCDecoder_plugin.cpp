@@ -35,6 +35,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <vector>
 #include "LibVTMDec.h"
 
 #ifdef HAVE_CONFIG_H
@@ -48,7 +49,7 @@
 #define N_(str) (str)
 
   /*****************************************************************************
-   * decoder_sys_t : raw video decoder descriptor
+   * decoder_sys_t : video decoder descriptor
    *****************************************************************************/
 struct decoder_sys_t
 {
@@ -76,6 +77,16 @@ struct decoder_sys_t
   mtime_t dts2;
   size_t dec_frame_count;
   size_t out_frame_count;
+  struct layer_info
+  {
+    int id;
+    int width;
+    int height;
+    int posx;
+    int posy;
+  };
+  std::vector<layer_info> outputLayers;
+  picture_t* p_pic;
 };
 
 /****************************************************************************
@@ -84,7 +95,8 @@ struct decoder_sys_t
 static int  OpenDecoder(vlc_object_t*);
 static void CloseDec(vlc_object_t*);
 static int DecodeFrame(decoder_t* p_dec, block_t* p_block);
-static void FillPicture(decoder_t* p_dec, picture_t* p_pic, short* planes[3], int strides[3]);
+static void FillPicture(decoder_t* p_dec, picture_t* p_pic, int posx, int posy,
+  int picWidth, int picHeight, short* planes[3], int strides[3]);
 static void Flush(decoder_t* p_dec);
 static bool getOutputFrame(decoder_t* p_dec, bool waitUntilReady, mtime_t i_dts);
 static int initVideoFormat(decoder_t* p_dec, decoder_sys_t* p_sys,
@@ -380,57 +392,106 @@ static void Flush(decoder_t* p_dec)
   //getOutputFrame(p_dec, nullptr);
 }
 
+short chromaGreyValue(vlc_fourcc_t i_chroma)
+{
+  short greyChromaVal = 0;
+  switch (i_chroma)
+  {
+  case VLC_CODEC_I420_12L:
+  case VLC_CODEC_I422_12L:
+  case VLC_CODEC_I444_12L:
+    greyChromaVal = (1 << (12 - 1));
+    break;
+  case VLC_CODEC_I420_10L:
+  case VLC_CODEC_I422_10L:
+  case VLC_CODEC_I444_10L:
+    greyChromaVal = (1 << (10 - 1));
+    break;
+  case VLC_CODEC_GREY:
+  case VLC_CODEC_I420:
+  case VLC_CODEC_I422:
+  case VLC_CODEC_I444:
+  default:
+    greyChromaVal = (1 << (8 - 1));
+  }
+  return greyChromaVal;
+}
 /*****************************************************************************
  * FillPicture:
  *****************************************************************************/
-static void FillPicture(decoder_t* p_dec, picture_t* p_pic, short* planes[3], int strides[3])
+static void FillPicture(decoder_t* p_dec, picture_t* p_pic, int posx, int posy,
+  int picWidth, int picHeight, short* planes[3], int strides[3])
 {
   decoder_sys_t* p_sys = p_dec->p_sys;
   for (int i = 0; i < p_pic->i_planes; i++)
   {
     if (planes[i])
     {
-      uint8_t* p_dstPlane = p_pic->p[i].p_pixels;
+      const int widthRatio = (i == 0) ? 1 : p_pic->p[0].i_visible_pitch / p_pic->p[i].i_visible_pitch;
+      const int heightRatio = (i == 0) ? 1 : p_pic->p[0].i_visible_lines / p_pic->p[i].i_visible_lines;
+      const int planeWidth = picWidth / widthRatio;
+      const int planeHeight = picHeight / heightRatio;
+      const int xOffset = (posx / widthRatio) * p_pic->p[i].i_pixel_pitch;
+      const int yOffset = (posy / heightRatio);
+      const int picPitch = std::min(planeWidth * p_pic->p[i].i_pixel_pitch, p_pic->p[i].i_visible_pitch - xOffset);
+      uint8_t* p_dstPlane = p_pic->p[i].p_pixels + yOffset * p_pic->p[i].i_pitch + xOffset;
+      const int lines = std::min(planeHeight, p_pic->p[i].i_visible_lines - yOffset);
       short* p_src = planes[i];
-
-      for (int y = 0; y < p_pic->p[i].i_visible_lines; y++)
+      if (p_pic->p[i].i_pixel_pitch == 1)
       {
-        if (p_pic->p[i].i_pixel_pitch == 1)
+        for (int y = 0; y < lines; y++)
         {
-          for (int x = 0; x < p_pic->p[i].i_visible_pitch; x++)
+          for (int x = 0; x < picPitch; x++)
           {
             p_dstPlane[x] = (uint8_t)p_src[x];
           }
+          p_dstPlane += p_pic->p[i].i_pitch;
+          p_src += strides[i];
         }
-        else
+        }
+      else if(picPitch > 0)
+
         {
-          memcpy(p_dstPlane, p_src, p_pic->p[i].i_visible_pitch);
-        }
+        for (int y = 0; y < lines; y++)
+        {
+          memcpy(p_dstPlane, p_src, picPitch);
         p_dstPlane += p_pic->p[i].i_pitch;
         p_src += strides[i];
       }
+        const int visibleWidth = picPitch / p_pic->p[i].i_pixel_pitch;
+        const short fillVal = (i == 0) ? 0 : chromaGreyValue(p_dec->fmt_out.video.i_chroma);
+
+        for (int y = lines; y < p_pic->p[i].i_visible_lines - yOffset; y++)
+      {
+        short* dst = (short*)p_dstPlane;
+          for (int x = 0; x < visibleWidth; x++)
+        {
+            dst[x] = fillVal;
+          }
+          p_dstPlane += p_pic->p[i].i_pitch;
+          }
+        }
     }
     else if (i > 0 && p_pic->p[i].p_pixels)
     {
-      uint8_t* p_dstPlane = p_pic->p[i].p_pixels;
-
-      for (int y = 0; y < p_pic->p[i].i_visible_lines; y++)
-      {
+      const int widthRatio = (i == 0) ? 1 : p_pic->p[0].i_visible_pitch / p_pic->p[i].i_visible_pitch;
+      const int heightRatio = (i == 0) ? 1 : p_pic->p[0].i_visible_lines / p_pic->p[i].i_visible_lines;
+      const int planeWidth = picWidth / widthRatio;
+      const int planeHeight = picHeight / heightRatio;
+      const int xOffset = (posx / widthRatio) * p_pic->p[i].i_pixel_pitch;
+      const int yOffset = (posy / heightRatio);
+      const int picPitch = std::min(planeWidth * p_pic->p[i].i_pixel_pitch, p_pic->p[i].i_visible_pitch - xOffset);
+      uint8_t* p_dstPlane = p_pic->p[i].p_pixels + yOffset * p_pic->p[i].i_pitch + xOffset;
+      //const int lines = std::min(planeHeight, p_pic->p[i].i_visible_lines - yOffset);
+      const int visibleWidth = picPitch / p_pic->p[i].i_pixel_pitch;
+      for (int y = 0; y < p_pic->p[i].i_visible_lines - yOffset; y++)
+        {
         short* dst = (short*)p_dstPlane;
-        if (p_dec->fmt_out.video.i_chroma == VLC_CODEC_I420_10L)
-        {
-          for (int x = 0; x < p_pic->p[i].i_visible_pitch; x++)
+        const short fillVal = (i == 0) ? 0 : chromaGreyValue(p_dec->fmt_out.video.i_chroma);
+        for (int x = 0; x < visibleWidth; x++)
           {
-            dst[x] = 1 << (10 - 1);
+          dst[x] = fillVal;
           }
-        }
-        else if (p_dec->fmt_out.video.i_chroma == VLC_CODEC_I420_12L)
-        {
-          for (int x = 0; x < p_pic->p[i].i_visible_pitch; x++)
-          {
-            dst[x] = 1 << (12 - 1);
-          }
-        }
         p_dstPlane += p_pic->p[i].i_pitch;
       }
     }
@@ -438,7 +499,7 @@ static void FillPicture(decoder_t* p_dec, picture_t* p_pic, short* planes[3], in
 }
 
 
-static vlc_fourcc_t getVideoFormat(decoder_t* p_dec, int chromaFormat, int bitDepths)
+static vlc_fourcc_t getVideoFormat(decoder_t* p_dec, int chromaFormat, const int bitDepths)
 {
   vlc_fourcc_t videoFormat = p_dec->fmt_out.video.i_chroma; 
   switch (chromaFormat)
@@ -629,13 +690,47 @@ static bool getOutputFrame(decoder_t* p_dec, bool waitUntilReady, mtime_t i_dts)
   int width = 0, height = 0;
   int chromaFormat;
   int bitDepths;
-  if (decVTM_getNextOutputFrame(p_sys->decVtm, waitUntilReady, planes, strides, &width, &height, &chromaFormat, &bitDepths))
+  int outputLayer = 0;
+  if (decVTM_getNextOutputFrame(p_sys->decVtm, waitUntilReady, planes, strides, &width, &height, &chromaFormat, &bitDepths, &outputLayer))
   {
     // Get a new picture 
-    picture_t* p_pic = NULL;
+    picture_t* p_pic = p_sys->p_pic;
     p_sys->out_frame_count++;
     vlc_fourcc_t videoFormat = getVideoFormat(p_dec, chromaFormat, bitDepths);
+    bool outputLayerNew = true;
+    unsigned int outputLayerIdx = 0;
 
+    for (unsigned int i=0; i<p_sys->outputLayers.size(); i++)
+    {
+      if (p_sys->outputLayers[i].id == outputLayer)
+      {
+        outputLayerIdx = i;
+        outputLayerNew = false;
+        p_sys->outputLayers[i].width = width;
+        p_sys->outputLayers[i].height = height;
+        break;
+      }
+    }
+    if (outputLayerNew)
+    {
+      outputLayerIdx = (unsigned int)p_sys->outputLayers.size();
+      decoder_sys_t::layer_info layer = { outputLayer, width, height, 0, 0 };
+      p_sys->outputLayers.push_back(layer);
+      msg_Dbg(p_dec, "new layer nb %d: %d (total %d) ", outputLayerIdx, outputLayer, p_sys->outputLayers.size());
+    }
+    if (p_sys->outputLayers.size() > 1)
+    {
+      int totalWidth = 0, totalHeight = 0;
+      for (auto& l : p_sys->outputLayers)
+      {
+        l.posx = totalWidth;
+        l.posy = 0;
+        totalWidth += l.width;
+        totalHeight = std::max(totalHeight, l.height);
+      }
+      width = totalWidth;
+      height = totalHeight;
+    }
     if (width != p_dec->fmt_out.video.i_width
       || height != p_dec->fmt_out.video.i_height
       || videoFormat != p_dec->fmt_out.video.i_chroma)
@@ -651,14 +746,17 @@ static bool getOutputFrame(decoder_t* p_dec, bool waitUntilReady, mtime_t i_dts)
     mtime_t dat = mdate();
     if (planes[0] != nullptr)
     {
-      if (!decoder_UpdateVideoFormat(p_dec))
+      if (!decoder_UpdateVideoFormat(p_dec) && (outputLayerIdx == 0 || outputLayerNew))
+      {
         p_pic = decoder_NewPicture(p_dec);
+        p_sys->p_pic = p_pic;
+      }
       if (p_pic == NULL)
       {
         return false;
       }
-
-      FillPicture(p_dec, p_pic, planes, strides);
+      FillPicture(p_dec, p_pic, p_sys->outputLayers[outputLayerIdx].posx, p_sys->outputLayers[outputLayerIdx].posy,
+        p_sys->outputLayers[outputLayerIdx].width, p_sys->outputLayers[outputLayerIdx].height, planes, strides);
     }
     decVTM_setlastPicDisplayed(p_sys->decVtm);
 
@@ -685,9 +783,12 @@ static bool getOutputFrame(decoder_t* p_dec, bool waitUntilReady, mtime_t i_dts)
     }
 
     mtime_t i_pts = date_Get(&p_sys->pts);
+    if (outputLayerIdx == 0)
+    {
     date_Increment(&p_sys->pts, 1);
+    }
 
-    if (planes[0] != nullptr)
+    if (planes[0] != nullptr && (outputLayerIdx == p_sys->outputLayers.size()-1 || outputLayerNew))
     {
       p_sys->lastOutput_pts = i_pts - p_sys->firstOutput_pts;
       p_sys->lastOutput_time = mdate() - p_sys->firstOutput_time;
