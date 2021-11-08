@@ -1430,6 +1430,7 @@ static void PIDFillFormat( demux_t *p_demux, ts_stream_t *p_pes,
         es_format_Change( fmt, VIDEO_ES, VLC_CODEC_HEVC );
         break;
     case 0x32:  /* VVC */
+    case 0x33:  /* VVC */
         es_format_Change( fmt, VIDEO_ES, VLC_CODEC_VVC );
         break;
     case 0x42:  /* CAVS (Chinese AVS) */
