@@ -275,6 +275,18 @@ static block_t *PacketizeAnnexB(decoder_t *p_dec, block_t **pp_block)
 {
     decoder_sys_t *p_sys = p_dec->p_sys;
     block_t *output = packetizer_Packetize(&p_sys->packetizer, pp_block);
+    if (!output && !pp_block)
+    {
+      if (p_sys->frame2.p_chain)
+      {
+        block_ChainLastAppend(&p_sys->frame.pp_chain_last, p_sys->frame2.p_chain);
+        INITQ(frame2);
+      }
+      block_t* flushOutput = OutputQueues(p_sys, p_sys->b_init_sequence_complete);
+      block_ChainAppend(&output, flushOutput);
+
+      output = GatherAndValidateChain(output);
+    }
     if (output)
     {
       p_sys->i_nb_frames++;
@@ -301,13 +313,27 @@ static void PacketizeReset(void *p_private, bool b_broken)
     decoder_sys_t *p_sys = p_dec->p_sys;
 
     msg_Warn(p_dec, "packetizer reset called at pts: %d ", p_sys->pts);
+    if (p_sys->frame2.p_chain)
+    {
+      block_ChainLastAppend(&p_sys->frame.pp_chain_last, p_sys->frame2.p_chain);
+      INITQ(frame2);
+    }
+
     block_t *p_out = OutputQueues(p_sys, false);
     if(p_out)
         block_ChainRelease(p_out);
 
+    INITQ(frame);
+    INITQ(frame2);
     p_sys->b_init_sequence_complete = false;
-    p_sys->b_need_ts = true;
+    p_sys->sliceInPicture = false;
+    p_sys->lastTid = 0;
+    p_sys->gotPps = false;
+    p_sys->gotSps = false;
+    p_sys->i_nb_frames = 0;
     date_Set(&p_sys->dts, VLC_TS_INVALID);
+    p_sys->pts = VLC_TS_INVALID;
+    p_sys->b_need_ts = true;
 }
 
 
@@ -479,17 +505,6 @@ static block_t *ParseNALBlock(decoder_t *p_dec, bool *pb_ts_used, block_t *p_fra
         INITQ(frame2);
       }
       block_ChainLastAppend(&p_sys->frame.pp_chain_last, p_frag);
-    }
-
-    if (p_frag->i_flags & BLOCK_FLAG_LAST_PACKET_MASK)
-    {
-      if (p_sys->frame2.p_chain)
-      {
-        block_ChainLastAppend(&p_sys->frame.pp_chain_last, p_sys->frame2.p_chain);
-        INITQ(frame2);
-      }
-      block_t* flushOutput = OutputQueues(p_sys, p_sys->b_init_sequence_complete);
-      block_ChainAppend(&p_output, flushOutput);
     }
 
     p_output = GatherAndValidateChain(p_output);

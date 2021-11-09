@@ -617,6 +617,18 @@ static int DecodeFrame(decoder_t* p_dec, block_t* p_block)
     decVTM_flush(p_dec->p_sys->decVtm);
     msg_Warn(p_dec, "decoder flushed ! ");
     while (getOutputFrame(p_dec, true, VLC_TS_INVALID));
+
+    p_sys->b_first_frame = true;
+    p_sys->lastOutput_pts = VLC_TS_INVALID;
+    p_sys->firstOutput_pts = VLC_TS_INVALID;
+    p_sys->firstOutput_time = VLC_TS_INVALID;
+    p_sys->lastOutput_time = VLC_TS_INVALID;
+    p_sys->firstBlock_dts = VLC_TS_INVALID;
+    p_sys->firstBlock = true;
+    p_sys->b_format_init = true;
+    p_sys->b_frameRateDetect = false;
+    p_sys->speedUpLevel = 0;
+    p_sys->speedUpLevel_delai_increase = 0;
   }
   return VLCDEC_SUCCESS;
 }

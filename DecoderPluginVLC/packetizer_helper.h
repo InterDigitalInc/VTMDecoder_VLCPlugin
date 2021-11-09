@@ -25,7 +25,6 @@
 #include <vlc_block.h>
 
 #define BLOCK_FLAG_DROP                 (1 << BLOCK_FLAG_PRIVATE_SHIFT)
-#define BLOCK_FLAG_LAST_PACKET_MASK     (2 << BLOCK_FLAG_PRIVATE_SHIFT)
 
 enum
 {
@@ -131,7 +130,6 @@ static inline block_t *packetizer_Packetize( packetizer_t *p_pack, block_t **pp_
     if( p_block )
         block_BytestreamPush( &p_pack->bytestream, p_block );
 
-    bool addEofFlag = false;
     for( ;; )
     {
         bool b_used_ts;
@@ -176,7 +174,6 @@ static inline block_t *packetizer_Packetize( packetizer_t *p_pack, block_t **pp_
 
                 if( p_pack->i_offset <= (size_t)p_pack->i_startcode )
                     return NULL;
-                addEofFlag = true;
             }
 
             block_BytestreamFlush( &p_pack->bytestream );
@@ -187,10 +184,6 @@ static inline block_t *packetizer_Packetize( packetizer_t *p_pack, block_t **pp_
             p_pic = block_Alloc( p_pack->i_offset + p_pack->i_au_prepend );
             p_pic->i_pts = p_block_bytestream->i_pts;
             p_pic->i_dts = p_block_bytestream->i_dts;
-            if (addEofFlag)
-            {
-              p_pic->i_flags |= BLOCK_FLAG_LAST_PACKET_MASK;
-            }
 
             block_GetBytes( &p_pack->bytestream, &p_pic->p_buffer[p_pack->i_au_prepend],
                             p_pic->i_buffer - p_pack->i_au_prepend );
