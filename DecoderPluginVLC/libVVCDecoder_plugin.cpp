@@ -323,6 +323,115 @@ static int initVideoFormat(decoder_t* p_dec, decoder_sys_t* p_sys,
     frame_height = p_dec->fmt_in.video.i_height;
   }
 
+  p_dec->fmt_out.video.primaries = p_dec->fmt_in.video.primaries;
+  p_dec->fmt_out.video.transfer = p_dec->fmt_in.video.transfer;
+  p_dec->fmt_out.video.space = p_dec->fmt_in.video.space;
+  unsigned int primaries = 0, transfer = 0, matrix = -1, full_range_flag = -1, maxCLL = 0, maxFALL = 0;
+  if (decVTM_getColourDescriptionInfo(p_sys->decVtm, &primaries, &transfer, &matrix, &full_range_flag, &maxCLL, &maxFALL))
+  {
+    switch (primaries)
+    {
+    case 0:
+      break;
+    case 1:
+      p_dec->fmt_out.video.primaries = COLOR_PRIMARIES_BT709;
+      break;
+    case 4:
+      p_dec->fmt_out.video.primaries = COLOR_PRIMARIES_BT470_M;
+      break;
+    case 5:
+      p_dec->fmt_out.video.primaries = COLOR_PRIMARIES_BT601_625;
+      break;
+    case 6:
+      p_dec->fmt_out.video.primaries = COLOR_PRIMARIES_BT601_525;
+      break;
+    case 7:
+      p_dec->fmt_out.video.primaries = COLOR_PRIMARIES_SMTPE_240;
+      break;
+    case 9:
+      p_dec->fmt_out.video.primaries = COLOR_PRIMARIES_BT2020;
+      break;
+    case 11:
+    case 12:
+      p_dec->fmt_out.video.primaries = COLOR_PRIMARIES_DCI_P3;
+      break;
+    default:
+      p_dec->fmt_out.video.primaries = COLOR_PRIMARIES_UNDEF;
+    }
+
+    switch (transfer)
+    {
+    case 0:
+      break;
+    case 1:
+      p_dec->fmt_out.video.transfer = TRANSFER_FUNC_BT709;
+      break;
+    case 4:
+      p_dec->fmt_out.video.transfer = TRANSFER_FUNC_BT470_M;
+      break;
+    case 5:
+      p_dec->fmt_out.video.transfer = TRANSFER_FUNC_BT470_BG;
+      break;
+    case 6:
+      p_dec->fmt_out.video.transfer = TRANSFER_FUNC_SMPTE_170;
+      break;
+    case 7:
+      p_dec->fmt_out.video.transfer = TRANSFER_FUNC_SMPTE_240;
+      break;
+    case 8:
+      p_dec->fmt_out.video.transfer = TRANSFER_FUNC_LINEAR;
+      break;
+    case 13:
+      p_dec->fmt_out.video.transfer = TRANSFER_FUNC_SRGB;
+      break;
+    case 14:
+    case 15:
+      p_dec->fmt_out.video.transfer = TRANSFER_FUNC_BT2020;
+      break;
+    case 16:
+      p_dec->fmt_out.video.transfer = TRANSFER_FUNC_SMPTE_ST2084;
+      break;
+    case 18:
+      p_dec->fmt_out.video.transfer = TRANSFER_FUNC_HLG;
+      break;
+    default:
+      p_dec->fmt_out.video.transfer = TRANSFER_FUNC_UNDEF;
+    }
+
+    switch (matrix)
+    {
+    case -1:
+      break;
+    case 0:
+      p_dec->fmt_out.video.space = COLOR_SPACE_SRGB;
+      break;
+    case 1:
+      p_dec->fmt_out.video.space = COLOR_SPACE_BT709;
+      break;
+    case 5:
+    case 6:
+      p_dec->fmt_out.video.space = COLOR_SPACE_BT601;
+      break;
+    case 9:
+      // Rec. ITU-R BT.2020-2 (non-constant luminance)
+    case 10:
+      //Rec. ITU-R BT.2020-2 (constant luminance)
+      p_dec->fmt_out.video.space = COLOR_SPACE_BT2020;
+      break;
+    default:
+      p_dec->fmt_out.video.space = COLOR_SPACE_UNDEF;
+    }
+    if (full_range_flag >= 0)
+    {
+      p_dec->fmt_out.video.b_color_range_full = full_range_flag;
+    }
+    if (maxFALL > 0)
+    {
+      p_dec->fmt_out.video.lighting.MaxCLL = maxCLL;
+      p_dec->fmt_out.video.lighting.MaxFALL = maxFALL;
+    }
+  }
+
   video_format_Setup(&p_dec->fmt_out.video, videoFormat,
     frame_width, frame_height, frame_width, frame_height, 1, 1);
 
