@@ -835,5 +835,7 @@ static void CloseDec(vlc_object_t* p_this)
   msg_Info(p_dec, "output %d frames",p_dec->p_sys->out_frame_count);
   decVTM_flush(p_dec->p_sys->decVtm);
   decVTM_destroy(p_dec->p_sys->decVtm);
+  video_format_Setup(&p_dec->fmt_out.video, VLC_CODEC_UNKNOWN, p_dec->fmt_out.video.i_width, p_dec->fmt_out.video.i_height, p_dec->fmt_out.video.i_visible_width, p_dec->fmt_out.video.i_visible_height-2, 1, 1);
+  decoder_UpdateVideoFormat(p_dec);
   free(p_dec->p_sys);
 }
