@@ -676,7 +676,7 @@ static int DecodeFrame(decoder_t* p_dec, block_t* p_block)
   {
     mtime_t period = CLOCK_FREQ * p_sys->pts.i_divider_den / p_sys->pts.i_divider_num;
     mtime_t lateness = p_sys->lastOutput_time - p_sys->lastOutput_pts;
-    if (lateness > (p_sys->speedUpLevel) * period && p_sys->speedUpLevel_delai_increase-- <= 0 && p_sys->speedUpLevel < 3)
+    if (lateness > (p_sys->speedUpLevel) * period && p_sys->speedUpLevel_delai_increase-- <= 0 && p_sys->speedUpLevel < 4)
     {
       p_sys->speedUpLevel++;
       p_sys->speedUpLevel_delai_increase = 7;
