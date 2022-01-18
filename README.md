@@ -7,12 +7,13 @@ See also the README.md files inside the following subfolders for build instructi
 
 /************* Installation and usage  ************/
 
-Tested with VLC 3.0.9.2 and 3.0.12 (Windows)
+Tested with VLC 3.0.9.2 and 3.0.12 64-bit versions (Windows)
 
 1. Install VLC
 
 - download VLC media player.
 - unpack in (for example) C:\VLC
+note: in order to use windows compiled binaries (which are 64-bits), the 64-bits version of VLC is required
 
 2. Install plugin and decoder dlls
 
