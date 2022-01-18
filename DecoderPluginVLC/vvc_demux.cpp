@@ -284,27 +284,30 @@ int VvcDecoder::OpenDemux(vlc_object_t* p_this)
     fps = var_CreateGetFloat(p_demux, psz_fpsvar);
   }
 
+  std::string filename(p_demux->psz_location);
+  int pos = (int)filename.find_last_of("/\\");
+  filename = filename.substr(pos+1);
+
   if (!fps)
   {
-    if (strlen(p_demux->psz_location) > 3)
+    if (filename.size() > 3)
     {
-      std::string path(p_demux->psz_location);
-      int pos = (int)path.find("Hz");
-      if (pos == std::string::npos) (int)path.find("HZ");
-      if (pos == std::string::npos) (int)path.find("hz");
-      if (pos == std::string::npos) (int)path.find("fps");
-      if (pos == std::string::npos) (int)path.find("FPS");
+      int pos = (int)filename.find("Hz");
+      if (pos == std::string::npos) pos = (int)filename.find("HZ");
+      if (pos == std::string::npos) pos = (int)filename.find("hz");
+      if (pos == std::string::npos) pos = (int)filename.find("fps");
+      if (pos == std::string::npos) pos = (int)filename.find("FPS");
       if (pos != std::string::npos && pos > 0)
       {
         int length = 1;
-        while (pos - length >= 0 && path[pos - length] >= '0' && path[pos - length] <= '9')
+        while (pos - length >= 0 && filename[pos - length] >= '0' && filename[pos - length] <= '9')
         {
           length++;
         }
         length--;
         if (length > 0)
         {
-          std::string val = path.substr(std::max(0, pos - length), length);
+          std::string val = filename.substr(std::max(0, pos - length), length);
           fps = atof(val.c_str());
           if (fps)
           {
@@ -332,6 +335,55 @@ int VvcDecoder::OpenDemux(vlc_object_t* p_this)
   es_format_Init(&fmt, VIDEO_ES, VLC_CODEC_VVC);
   fmt.video.i_frame_rate = p_sys->dts.i_divider_num;
   fmt.video.i_frame_rate_base = p_sys->dts.i_divider_den;
+
+  if (filename.size() > 4)
+  {
+    int pos = (int)filename.find("HLG_");
+    if (pos == std::string::npos) pos = (int)filename.find("Hlg_");
+    if (pos == std::string::npos) pos = (int)filename.find("hlg_");
+    if (pos == std::string::npos) pos = (int)filename.find("_HLG");
+    if (pos == std::string::npos) pos = (int)filename.find("_Hlg");
+    if (pos == std::string::npos) pos = (int)filename.find("_hlg");
+    if (pos != std::string::npos && pos > 0)
+    {
+      fmt.video.primaries = COLOR_PRIMARIES_BT2020;
+      fmt.video.transfer = TRANSFER_FUNC_HLG;
+      fmt.video.space = COLOR_SPACE_BT2020;
+    }
+
+    pos = (int)filename.find("PQ_");
+    if (pos == std::string::npos) pos = (int)filename.find("Pq_");
+    if (pos == std::string::npos) pos = (int)filename.find("pq_");
+    if (pos == std::string::npos) pos = (int)filename.find("_PQ");
+    if (pos == std::string::npos) pos = (int)filename.find("_Pq");
+    if (pos == std::string::npos) pos = (int)filename.find("_pq");
+    if (pos != std::string::npos && pos > 0)
+    {
+      fmt.video.primaries = COLOR_PRIMARIES_BT2020;
+      fmt.video.transfer = TRANSFER_FUNC_SMPTE_ST2084;
+      fmt.video.space = COLOR_SPACE_BT2020;
+    }
+
+    pos = (int)filename.find("P3_");
+    if (pos == std::string::npos) pos = (int)filename.find("p3_");
+    if (pos == std::string::npos) pos = (int)filename.find("_P3");
+    if (pos == std::string::npos) pos = (int)filename.find("_p3");
+    if (pos != std::string::npos && pos > 0)
+    {
+      fmt.video.primaries = COLOR_PRIMARIES_DCI_P3;
+      fmt.video.space = COLOR_SPACE_UNDEF;
+    }
+
+    pos = (int)filename.find("_HDR10");
+    if (pos == std::string::npos) pos = (int)filename.find("_Hdr10");
+    if (pos == std::string::npos) pos = (int)filename.find("_hdr10");
+    if (pos != std::string::npos && pos > 0)
+    {
+      fmt.video.primaries = COLOR_PRIMARIES_BT2020;
+      fmt.video.transfer = TRANSFER_FUNC_SMPTE_ST2084;
+      fmt.video.space = COLOR_SPACE_BT2020;
+    }
+  }
   
   p_sys->p_packetizer = demux_PacketizerNew(p_demux, &fmt, "vvc");
 
