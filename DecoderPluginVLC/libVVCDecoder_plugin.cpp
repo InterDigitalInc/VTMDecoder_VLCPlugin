@@ -130,6 +130,7 @@ add_integer("nb-threads", 0, N_("Number of threads for decoding"), N_("number of
 add_integer("nb-threads-parsing", -1, N_("Maximum number of threads for CABAC parsing"), N_("Maximum number of threads for CABAC parsing (from same pool as decoding threads) [1-32]; -1: auto; 0: sequantial parsing and decoding"), false)
 add_integer("target-layer-set", -1, N_("Target output layer set"), N_("Target output layer set (for multi-layer streams)"), false)
 add_bool("vvc-enable-hurry-mode", true, N_("Enable hurry-up mode"), N_("hurry-up mode: skip decoding pictures if late"), false)
+add_string("vvc-opt", "", N_("other decoder options"), N_("generic decoder option: --option1=value1 --option2=value2 ... --optionN=valueN"), false)
 
 add_submodule()
 set_description(N_("VVC binary demuxer"))
@@ -224,6 +225,13 @@ static int OpenDecoder(vlc_object_t * p_this)
     targetLayerSet = (int)var_CreateGetInteger(p_dec, psz_targetLayer);
   }
 
+  char psz_vvcOpt[30];
+  char *opt;
+  if (sprintf(psz_vvcOpt, "vvc-opt"))
+  {
+    opt = var_CreateGetString(p_dec, psz_vvcOpt);
+  }
+
 #ifdef WIN32
   SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
   char* baseName = strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : (strrchr(__FILE__, '\\') ? strrchr(__FILE__, '\\') + 1 : __FILE__);
@@ -278,9 +286,9 @@ static int OpenDecoder(vlc_object_t * p_this)
   msg_Info(p_dec, "%s: successfully loaded library %s", baseName, VTM_LIB_NAME);
 #endif
 
-  msg_Info(p_dec, "using decoder with cfg --nbThreads=%d --nbThreadsForParsing=%d", nbThreads, nbThreadsForParsing);
+  msg_Info(p_dec, "using decoder with cfg --nbThreads=%d --nbThreadsForParsing=%d %s", nbThreads, nbThreadsForParsing, opt);
   // create & initialize internal classes
-  if (!(p_sys->decVtm = decVTM_create(nbThreads, nbThreadsForParsing, targetLayerSet)))
+  if (!(p_sys->decVtm = decVTM_create(nbThreads, nbThreadsForParsing, targetLayerSet, opt)))
   {
     return VLC_EGENERIC;
   }
