@@ -820,7 +820,8 @@ static bool getOutputFrame(decoder_t* p_dec, bool waitUntilReady, mtime_t i_dts)
   int chromaFormat;
   int bitDepths;
   int outputLayer = 0;
-  if (decVTM_getNextOutputFrame(p_sys->decVtm, waitUntilReady, planes, strides, &width, &height, &chromaFormat, &bitDepths, &outputLayer))
+  int nbSkippedPictures = 0;
+  if (decVTM_getNextOutputFrame(p_sys->decVtm, waitUntilReady, planes, strides, &width, &height, &chromaFormat, &bitDepths, &outputLayer, &nbSkippedPictures))
   {
     // Get a new picture 
     picture_t* p_pic = p_sys->p_pic;
@@ -911,10 +912,14 @@ static bool getOutputFrame(decoder_t* p_dec, bool waitUntilReady, mtime_t i_dts)
       p_sys->firstOutput_pts = i_pts;
     }
 
+    if (outputLayerIdx == 0 && nbSkippedPictures)
+    {
+      date_Increment(&p_sys->pts, nbSkippedPictures);
+    }
     mtime_t i_pts = date_Get(&p_sys->pts);
     if (outputLayerIdx == 0)
     {
-    date_Increment(&p_sys->pts, 1);
+      date_Increment(&p_sys->pts, 1);
     }
 
     if (planes[0] != nullptr && (outputLayerIdx == p_sys->outputLayers.size()-1 || outputLayerNew))
