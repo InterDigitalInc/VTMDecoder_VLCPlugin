@@ -70,8 +70,13 @@ struct decoder_sys_t
   mtime_t firstOutput_pts; 
   mtime_t firstOutput_time; 
   mtime_t lastOutput_time; 
+  static const int MAX_SPEED_UP_LEVEL = 4;
+  static const int SPDUP_DELAY_BASE = 10;
   int speedUpLevel;
   int speedUpLevel_delai_increase;
+  int speedUpLevel_delai_decrease;
+  mtime_t speedUpLevel_previous_lateness;
+  mtime_t speedUpLevel_delai_derivative;
   mtime_t dts1;
   mtime_t diff_dts;
   mtime_t dts2;
@@ -306,6 +311,9 @@ static int OpenDecoder(vlc_object_t * p_this)
   p_sys->out_frame_count = 0;
   p_sys->speedUpLevel = 0;
   p_sys->speedUpLevel_delai_increase = 0;
+  p_sys->speedUpLevel_delai_decrease = 0;
+  p_sys->speedUpLevel_previous_lateness = 0;
+  p_sys->speedUpLevel_delai_derivative = 0;
 
   /////////////////////////////
 
@@ -740,25 +748,6 @@ static int DecodeFrame(decoder_t* p_dec, block_t* p_block)
     }
   }
 
-  mtime_t sys_pts = date_Get(&p_sys->pts);
-  if (p_sys->enable_hurryMode && sys_pts > VLC_TS_INVALID && p_block)
-  {
-    mtime_t period = CLOCK_FREQ * p_sys->pts.i_divider_den / p_sys->pts.i_divider_num;
-    mtime_t lateness = p_sys->lastOutput_time - p_sys->lastOutput_pts;
-    if (lateness > (p_sys->speedUpLevel) * period && p_sys->speedUpLevel_delai_increase-- <= 0 && p_sys->speedUpLevel < 4)
-    {
-      p_sys->speedUpLevel++;
-      p_sys->speedUpLevel_delai_increase = 7;
-    }
-    else if (p_sys->speedUpLevel > 0 && ((lateness < 0 && p_sys->speedUpLevel_delai_increase-- <= 0) || (lateness < - 4 * period )))
-    {
-      p_sys->speedUpLevel--;
-      p_sys->speedUpLevel_delai_increase = 20;
-    }
-    if (p_sys->speedUpLevel > 0) 
-     msg_Info(p_dec, "decoding frame %d (delay %d) - speed up %d", p_sys->dec_frame_count, lateness, p_sys->speedUpLevel);
-  } 
-
   //msg_Warn(p_dec, "decVtm decode frame %d with nalu size %d ", p_sys->dec_frame_count, (p_block != nullptr) ? p_block->i_buffer : 0);
   decVTM_decode(p_sys->decVtm, (const char*)((p_block != nullptr) ? p_block->p_buffer : nullptr), (p_block != nullptr) ? p_block->i_buffer : 0, p_sys->speedUpLevel);
   if (p_block != nullptr)
@@ -807,6 +796,9 @@ static int DecodeFrame(decoder_t* p_dec, block_t* p_block)
     p_sys->b_frameRateDetect = false;
     p_sys->speedUpLevel = 0;
     p_sys->speedUpLevel_delai_increase = 0;
+    p_sys->speedUpLevel_delai_decrease = 0;
+    p_sys->speedUpLevel_previous_lateness = 0;
+    p_sys->speedUpLevel_delai_derivative = 0;
   }
   return VLCDEC_SUCCESS;
 }
@@ -919,13 +911,41 @@ static bool getOutputFrame(decoder_t* p_dec, bool waitUntilReady, mtime_t i_dts)
     mtime_t i_pts = date_Get(&p_sys->pts);
     if (outputLayerIdx == 0)
     {
+      p_sys->lastOutput_pts = i_pts - p_sys->firstOutput_pts;
+      p_sys->lastOutput_time = mdate() - p_sys->firstOutput_time;
+
+      if (p_sys->enable_hurryMode)
+      {
+        mtime_t period = CLOCK_FREQ * p_sys->pts.i_divider_den / p_sys->pts.i_divider_num;
+        mtime_t lateness = p_sys->lastOutput_time - p_sys->lastOutput_pts;
+        mtime_t lateness_derivative = lateness - p_sys->speedUpLevel_previous_lateness;
+        p_sys->speedUpLevel_previous_lateness = lateness;
+        p_sys->speedUpLevel_delai_derivative = (7 * p_sys->speedUpLevel_delai_derivative + 1 * lateness_derivative) / 8;
+        if (p_sys->speedUpLevel < decoder_sys_t::MAX_SPEED_UP_LEVEL
+          && p_sys->speedUpLevel_delai_derivative >= 0
+          && lateness > period  && p_sys->speedUpLevel_delai_increase-- <= 0)
+        {
+          p_sys->speedUpLevel_delai_increase = (1 << p_sys->speedUpLevel) * decoder_sys_t::SPDUP_DELAY_BASE;
+          p_sys->speedUpLevel = std::min(decoder_sys_t::MAX_SPEED_UP_LEVEL, p_sys->speedUpLevel + 2);
+          p_sys->speedUpLevel_delai_decrease = decoder_sys_t::SPDUP_DELAY_BASE;
+        }
+        else if (p_sys->speedUpLevel > 0 
+          && p_sys->speedUpLevel_delai_derivative < 0
+          && (lateness < -period && p_sys->speedUpLevel_delai_decrease-- <= 0))
+        {
+          p_sys->speedUpLevel_delai_decrease = (1 << p_sys->speedUpLevel) * decoder_sys_t::SPDUP_DELAY_BASE;
+          p_sys->speedUpLevel--;
+          p_sys->speedUpLevel_delai_increase = decoder_sys_t::SPDUP_DELAY_BASE;
+        }
+        //if (p_sys->speedUpLevel > 0)
+          msg_Info(p_dec, "decoding frame %d (delay %d, derivative %d) - speed up %d", p_sys->out_frame_count, lateness, p_sys->speedUpLevel_delai_derivative, p_sys->speedUpLevel);
+      }
+
       date_Increment(&p_sys->pts, 1);
     }
 
     if (planes[0] != nullptr && (outputLayerIdx == p_sys->outputLayers.size()-1 || outputLayerNew))
     {
-      p_sys->lastOutput_pts = i_pts - p_sys->firstOutput_pts;
-      p_sys->lastOutput_time = mdate() - p_sys->firstOutput_time;
 
       p_pic->date = i_pts;
       p_pic->b_force = true;
