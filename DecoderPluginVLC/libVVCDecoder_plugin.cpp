@@ -937,7 +937,7 @@ static bool getOutputFrame(decoder_t* p_dec, bool waitUntilReady, mtime_t i_dts)
           p_sys->speedUpLevel--;
           p_sys->speedUpLevel_delai_increase = decoder_sys_t::SPDUP_DELAY_BASE;
         }
-        //if (p_sys->speedUpLevel > 0)
+        if (p_sys->speedUpLevel > 0)
           msg_Info(p_dec, "decoding frame %d (delay %d, derivative %d) - speed up %d", p_sys->out_frame_count, lateness, p_sys->speedUpLevel_delai_derivative, p_sys->speedUpLevel);
       }
 
