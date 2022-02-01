@@ -39,6 +39,7 @@ endif()
 if( MSVC )
   add_compile_options( "/MP" )
   add_compile_options( "/EHsc" )
+  set(CMAKE_CXX_STANDARD_LIBRARIES "")
   # ----------------------------------------------------------------------------
 # Use statically or dynamically linked CRT?
 # Default: static
