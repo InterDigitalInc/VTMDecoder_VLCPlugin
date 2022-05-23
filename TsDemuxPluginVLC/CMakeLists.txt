@@ -174,44 +174,44 @@ set_target_properties( ${LIB_NAME}  PROPERTIES
 ENDIF()
 
 target_compile_definitions( ${LIB_NAME} PRIVATE MODULE_STRING="vvctsdemux" __PLUGIN__ )
+target_compile_definitions( ${LIB_NAME} PRIVATE HAVE_CONFIG_H )
 
+add_custom_command( TARGET dvbpsi POST_BUILD COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}dvbpsi/)
+add_custom_command( TARGET dvbpsi POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
+													  ${DVBPSI_DIR}/src/dvbpsi.h ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}dvbpsi/)
+add_custom_command( TARGET dvbpsi POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
+													  ${DVBPSI_DIR}/src/demux.h ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}dvbpsi/)
+add_custom_command( TARGET dvbpsi POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
+													  ${DVBPSI_DIR}/src/descriptor.h ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}dvbpsi/)
+add_custom_command( TARGET dvbpsi POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
+													  ${DVBPSI_DIR}/src/psi.h ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}dvbpsi/)
+add_custom_command( TARGET dvbpsi POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
+													  ${DVBPSI_DIR}/src/tables/pat.h ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}dvbpsi/)
+add_custom_command( TARGET dvbpsi POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
+													  ${DVBPSI_DIR}/src/tables/sdt.h ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}dvbpsi/)
+add_custom_command( TARGET dvbpsi POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
+													  ${DVBPSI_DIR}/src/tables/pmt.h ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}dvbpsi/)
+add_custom_command( TARGET dvbpsi POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
+													  ${DVBPSI_DIR}/src/tables/eit.h ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}dvbpsi/)
+add_custom_command( TARGET dvbpsi POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
+													  ${DVBPSI_DIR}/src/tables/tot.h ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}dvbpsi/)
+add_custom_command( TARGET dvbpsi POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
+													  ${DVBPSI_DIR}/src/tables/atsc_stt.h ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}dvbpsi/)
+add_custom_command( TARGET dvbpsi POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
+													  ${DVBPSI_DIR}/src/tables/atsc_mgt.h ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}dvbpsi/)
+add_custom_command( TARGET dvbpsi POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
+													  ${DVBPSI_DIR}/src/tables/atsc_vct.h ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}dvbpsi/)
+add_custom_command( TARGET dvbpsi POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
+													  ${DVBPSI_DIR}/src/tables/atsc_eit.h ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}dvbpsi/)
+add_custom_command( TARGET dvbpsi POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
+													  ${DVBPSI_DIR}/src/tables/atsc_ett.h ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}dvbpsi/)
+add_custom_command( TARGET dvbpsi POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
+													  ${DVBPSI_DIR}/src/descriptors/dr.h ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}dvbpsi/)
+add_custom_command( TARGET dvbpsi POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
+													  ${DVBPSI_DIR}/src/descriptors/dr_a0.h ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}dvbpsi/)
+													  
+SET_SOURCE_FILES_PROPERTIES("${DVBPSI_DIR}/src/tables/sis.c" PROPERTIES LANGUAGE CXX )
 if( MSVC )
-  add_custom_command( TARGET dvbpsi POST_BUILD COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}dvbpsi/)
-  add_custom_command( TARGET dvbpsi POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                                                          ${DVBPSI_DIR}/src/dvbpsi.h ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}dvbpsi/)
-  add_custom_command( TARGET dvbpsi POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                                                          ${DVBPSI_DIR}/src/demux.h ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}dvbpsi/)
-  add_custom_command( TARGET dvbpsi POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                                                          ${DVBPSI_DIR}/src/descriptor.h ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}dvbpsi/)
-  add_custom_command( TARGET dvbpsi POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                                                          ${DVBPSI_DIR}/src/psi.h ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}dvbpsi/)
-  add_custom_command( TARGET dvbpsi POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                                                          ${DVBPSI_DIR}/src/tables/pat.h ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}dvbpsi/)
-  add_custom_command( TARGET dvbpsi POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                                                          ${DVBPSI_DIR}/src/tables/sdt.h ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}dvbpsi/)
-  add_custom_command( TARGET dvbpsi POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                                                          ${DVBPSI_DIR}/src/tables/pmt.h ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}dvbpsi/)
-  add_custom_command( TARGET dvbpsi POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                                                          ${DVBPSI_DIR}/src/tables/eit.h ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}dvbpsi/)
-  add_custom_command( TARGET dvbpsi POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                                                          ${DVBPSI_DIR}/src/tables/tot.h ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}dvbpsi/)
-  add_custom_command( TARGET dvbpsi POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                                                          ${DVBPSI_DIR}/src/tables/atsc_stt.h ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}dvbpsi/)
-  add_custom_command( TARGET dvbpsi POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                                                          ${DVBPSI_DIR}/src/tables/atsc_mgt.h ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}dvbpsi/)
-  add_custom_command( TARGET dvbpsi POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                                                          ${DVBPSI_DIR}/src/tables/atsc_vct.h ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}dvbpsi/)
-  add_custom_command( TARGET dvbpsi POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                                                          ${DVBPSI_DIR}/src/tables/atsc_eit.h ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}dvbpsi/)
-  add_custom_command( TARGET dvbpsi POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                                                          ${DVBPSI_DIR}/src/tables/atsc_ett.h ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}dvbpsi/)
-  add_custom_command( TARGET dvbpsi POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                                                          ${DVBPSI_DIR}/src/descriptors/dr.h ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}dvbpsi/)
-  add_custom_command( TARGET dvbpsi POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                                                          ${DVBPSI_DIR}/src/descriptors/dr_a0.h ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}dvbpsi/)
-														  
-  SET_SOURCE_FILES_PROPERTIES("${DVBPSI_DIR}/src/tables/sis.c" PROPERTIES LANGUAGE CXX )
-  target_compile_definitions( ${LIB_NAME} PRIVATE HAVE_CONFIG_H )
   target_compile_options( ${LIB_NAME} PRIVATE "-WX-" )
 else()
   target_compile_options( ${LIB_NAME} PRIVATE "-Wno-error" )

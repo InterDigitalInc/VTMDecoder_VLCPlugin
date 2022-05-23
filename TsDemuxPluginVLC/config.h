@@ -15,8 +15,6 @@ typedef SSIZE_T ssize_t;
 #define asprintf(...) false // TODO
 #define timegm( x ) 4 // TODO
 #define __attribute__(x)
-#define N_(x) x // TODO
-#define _(x) x // TODO
 static char* strndup(char const* s, size_t n)
 {
   size_t len = strnlen(s, n);
@@ -27,5 +25,7 @@ static char* strndup(char const* s, size_t n)
   return (char*) memcpy(newChar, s, len);
 }
 #endif
+#define N_(x) x // TODO
+#define _(x) x // TODO
 
 #endif
