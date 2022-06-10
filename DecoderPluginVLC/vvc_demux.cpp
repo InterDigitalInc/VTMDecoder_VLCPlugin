@@ -167,7 +167,7 @@ static int ProbeVVC(const uint8_t* p_peek, size_t i_peek, vvc_probe_ctx_t* p_ctx
 int VvcDecoder::OpenDemux(vlc_object_t* p_this)
 {
   vvc_probe_ctx_t ctx = { 0, 0, 0 };
-  const char* rgi_psz_ext[] = { ".h266", ".266", ".bin", ".bit", ".raw", NULL };
+  const char* rgi_psz_ext[] = { ".h266", ".266", ".bin", ".bit", ".raw", ".vvc", ".mp4", ".mkv", ".webm", ".m4v", NULL };
   const char* rgi_psz_mime[] = { "video/H266", "video/h266", "video/vvc", NULL };
 
   demux_sys_t* p_sys;
