@@ -180,7 +180,8 @@ int VvcDecoder::OpenPack(vlc_object_t *p_this)
     decoder_t     *p_dec = (decoder_t*)p_this;
     decoder_sys_t *p_sys;
 
-    if (p_dec->fmt_in.i_codec != VLC_FOURCC('h', '2', '6', '6'))
+    if (p_dec->fmt_in.i_codec != VLC_FOURCC('h', '2', '6', '6')
+      && p_dec->fmt_in.i_codec != VLC_FOURCC('v', 'v', 'c', '1'))
         return VLC_EGENERIC;
 
     p_dec->p_sys = p_sys = (decoder_sys_t *)calloc(1, sizeof(decoder_sys_t));
